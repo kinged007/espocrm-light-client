@@ -11,14 +11,9 @@ class EspoCRMLightClient {
 	function __construct($url) {
 		session_start();
 		$this->base_url = $url;
-		$this->user = $_SESSION['espo_user'];
-		$this->pass = $_SESSION['espo_token'];
 
 		$this->check_login();
 		$this->router();
-
-		//$this->call_api("Call");
-
 	}
 
 
@@ -45,10 +40,6 @@ class EspoCRMLightClient {
 			curl_close($curl);
 			die('404 Not found.'. print_r($curl_info,true));
 
-		} else if($curl_info['http_code'] == '401'){
-			curl_close($curl);
-			die('401 Unauthorized.');
-
 		}
 
 		curl_close($curl);
@@ -60,13 +51,27 @@ class EspoCRMLightClient {
 	}
 
 	private function check_login() {
-		if (!isset($_SESSION['espo_token'])) {
-			if(!isset($_GET['acc']) || $_GET['acc'] != 'sing_in'){
-				header('Location: ?acc=sing_in');
-				die();
+		$login = false;
+		$msg = '';
+		
+		if(isset($_SESSION['espo_user']) || isset($_SESSION['espo_token']) ){
+			$this->user = $_SESSION['espo_user'];
+			$this->pass = $_SESSION['espo_token'];
+		
+			$api = $this->call_api('App/user');
+			$resp = json_decode($api['response']);
+			$status = $api['info']['http_code'];
+			
+			if($status == '401') { 
+				$msg = "Session expired.";
+			} else {
+				$login = true;
 			}
-		} else {
-			return true;
+		}
+
+		if(!$login && isset($_GET['acc']) && $_GET['acc'] != 'sing_in'){
+			header('Location: ?acc=sing_in&msg='.$msg);
+			die();
 		}
 
 	}
@@ -121,20 +126,45 @@ class EspoCRMLightClient {
 	}
 
 
-/**
-	 *
-	 *
-	 **********************************  $Router  *******************************
-	 */
-
-
-
 
 	/**
 	 *
 	 *
 	 **********************************  $Views  ********************************
 	 */
+
+	function sing_in(){
+		$msg = '';
+
+		if(isset($_POST['user']) && isset($_POST['pass'])){
+			$this->user = $_POST['user'];
+			$this->pass = $_POST['pass'];
+
+			$api = $this->call_api('App/user');
+			$resp = json_decode($api['response']);
+			$status = $api['info']['http_code'];
+
+			if($status == '401') {
+				$msg = '<strong class="error">User or password incorrect.</strong>';
+			
+			} else if($status == '200') {
+				$_SESSION['espo_user'] = $_POST['user'];
+				$_SESSION['espo_token'] = $resp->token;
+				header('Location: ?exp=index');
+				die();
+			}
+		} else {
+			if (isset($_GET["msg"]) && $_GET["msg"] != '') {
+				$msg = '<strong class="error">'.$_GET["msg"].'</strong>';
+			}
+		}
+
+		$this->render('sing_in');
+
+		echo $msg;
+	}
+
+
 	function index() {
 		$api = $this->call_api('Settings');
 		$resp = json_decode($api['response']);
@@ -240,35 +270,6 @@ class EspoCRMLightClient {
 
 
 
-	function sing_in(){
-		$msg = '';
-
-		if(isset($_POST['user']) && isset($_POST['pass'])){
-			$this->user = $_POST['user'];
-			$this->pass = $_POST['pass'];
-
-			$api = $this->call_api('App/user');
-			$resp = json_decode($api['response']);
-			$status = $api['info']['http_code'];
-
-			if($status == '401') {
-				$msg = '<strong class="error">User or password incorrect.</strong>';
-			
-			} else if($status == '200') {
-				$_SESSION['espo_user'] = $_POST['user'];
-				$_SESSION['espo_token'] = $resp->token;
-			}
-		}
-
-		if($this->check_login()){
-			header('Location: ?exp=index');
-			die();
-		}
-
-		$this->render('sing_in');
-
-		echo $msg;
-	}
 
 
 
