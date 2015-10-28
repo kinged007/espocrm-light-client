@@ -5,7 +5,7 @@
  ****************************  $Common Functions  ***************************
  */
 function call_api($url, $user = null, $pass = null){
-	$base_url = 'http://localhost/espocrm/api/v1/';
+	global $base_url;
 
 	if (!isset($user)){ $user = $_SESSION['espo_user']; }
 	if (!isset($pass)){ $pass = $_SESSION['espo_token']; }
