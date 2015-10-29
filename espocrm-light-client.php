@@ -1,5 +1,46 @@
 <?php
 
+class Router {
+	private $routes = [];
+	private $views = [];
+
+	function __construct($views) {
+		$this->views = $views;
+	}
+
+	public function add($route, $view) {
+		$this->routes[$route] = $view;
+	}
+
+	public function start(){
+		$curr_route = '/';
+		if (isset($_GET['route']) && $_GET['route'] != ''){
+			$curr_route = $_GET['route'];
+		}
+		
+		$match = false;
+		
+		foreach ($this->routes as $route => $view) {
+			$route = str_replace(':word:', '(\w+)', $route);
+			$route = str_replace(':hex:', '([0-9a-fA-F]+)', $route);
+
+			preg_match ( '#^'.$route.'$#' , $curr_route, $matches);
+			if (count($matches) > 0) {
+				$this->views->render(
+					$view,
+					$matches
+				);
+				$match = true;
+				break;
+			
+			} 
+		}
+		if(!$match) {
+			die('404 Route Not Found.');
+		}
+	}
+}
+
 class Views {
 	private $client = null;
 	private $templates = null;
@@ -42,8 +83,9 @@ class Views {
 
 		$data = '<ul class="list">';
 		foreach ($resp->tabList as $value) {
-			$data .= '<li><a href="?acc=view&exp=' . $value . '">' . $value . 
-							'</a></li>';
+			$data .= '<li><a href="?route=/entity/'.$value.'">
+						' . $value . '
+					</a></li>';
 		}
 		$data .= '</ul>';
 
@@ -51,11 +93,8 @@ class Views {
 		echo $this->replaceData($tpl, ['data' => $data]);
 	}
 
-	private function view() {
-		if(isset($_GET['exp'])){
-			$exp = $_GET['exp'];
-		}
-
+	private function view($data) {
+		$exp = $data[1];
 		$sort = 'sortBy=name&asc=true';
 
 		if ($exp == 'Email') {
@@ -122,8 +161,10 @@ class Views {
 			}
 			
 			if ($show) {
-				$list .= '<li><a href="?acc=item&exp=' . $exp . '/' .
-					$value->id . '">' . $showName . '</a></li>';
+				$list .= '
+					<li><a href="?route=/entity/'.$exp.'/'.$value->id.'">
+						'.$showName.'
+					</a></li>';
 			}
 		}
 		$list .= '</ul>';
@@ -135,10 +176,8 @@ class Views {
 		]);
 	}
 
-	private function item() {
-		if(isset($_GET['exp'])){
-			$exp = $_GET['exp'];
-		}
+	private function item($data) {
+		$exp = $data[1].'/'.$data[2];
 
 		$api = $this->client->call_api($exp.'?sortBy=name&asc=true');
 		$resp = json_decode($api['response']);
@@ -248,8 +287,8 @@ class Templates {
 	private $index = '
 <h1>Index</h1>
 <ul class="list">
-	<li><a href="?acc=entity">Entities</a></li>
-	<li><a href="?acc=addtask">Add Task</a></li>
+	<li><a href="?route=/entity">Entities</a></li>
+	<li><a href="?route=/addtask">Add Task</a></li>
 </ul>
 ';
 		
@@ -294,11 +333,18 @@ class EspoCRMLightClient {
 	function __construct($url) {
 		session_start();
 		$this->views = new views($this);
+		$this->router = new Router($this->views);
 		$this->base_url = $url;
+
+		$this->router->add('/', 'index');
+		$this->router->add('/index', 'index');
+		$this->router->add('/entity', 'entity');
+		$this->router->add('/entity/:word:', 'view');
+		$this->router->add('/entity/:word:/:hex:', 'item');
+		$this->router->add('/sing_in', 'sing_in');
 
 		$this->check_login();
 	}
-
 
 
 	public function call_api($url){
@@ -360,7 +406,7 @@ class EspoCRMLightClient {
 			
 			// Current session
 			} else {
-				$this->router();
+				$this->router->start();
 			}
 		
 		// There is no previous session
@@ -397,41 +443,6 @@ class EspoCRMLightClient {
 		} else {
 			//$msg = '<strong class="error">'.$_GET["msg"].'</strong>';
 			$this->views->render('sing_in');
-		}
-	}
-
-
-
-	function router() {
-		if(!isset($_GET['acc']) || $_GET['acc'] == '' ){
-			header('Location: ?acc=index');
-			die();
-
-		} else {
-			$acc = $_GET['acc'];
-			
-		}
-
-		if ($acc == 'index') {
-			$this->views->render('index');
-
-		} else if ($acc == 'entity') {
-			$this->views->render('entity');
-		
-		} else if ($acc == 'sing_in') {
-			$this->views->render('sing_in');
-		
-		} else if ($acc == 'view') {
-			$this->views->render('view');
-		
-		} else if ($acc == 'item') {
-			$this->views->render('item');
-		
-		} else if ($acc == 'addtask') {
-			$this->views->render('addtask');
-		
-		} else {
-			die('Error: Unrecognized expression.');
 		}
 	}
 }
