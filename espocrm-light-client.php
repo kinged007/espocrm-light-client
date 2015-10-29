@@ -81,11 +81,15 @@ class Views {
 		$api = $this->client->call_api('Settings');
 		$resp = json_decode($api['response']);
 
+		sort($resp->tabList);
+
 		$data = '<ul class="list">';
 		foreach ($resp->tabList as $value) {
-			$data .= '<li><a href="?route=/entity/'.$value.'">
-						' . $value . '
-					</a></li>';
+			if (!in_array($value, $this->client->excludeEntities)) {
+				$data .= '<li><a href="?route=/entity/'.$value.'">
+							' . $value . '
+						</a></li>';
+			}
 		}
 		$data .= '</ul>';
 
@@ -338,13 +342,16 @@ class EspoCRMLightClient {
 	private $user = null;
 	private $pass = null;
 	private $views = null;
+	
+	public $excludeEntities = [];
 
 
 
-	function __construct($url) {
+	function __construct($url, $entities) {
 		session_start();
 		$this->views = new views($this);
 		$this->router = new Router($this->views);
+		$this->excludeEntities = $entities;
 		$this->base_url = $url;
 
 		$this->router->add('/', 'index');
@@ -356,6 +363,8 @@ class EspoCRMLightClient {
 
 		$this->check_login();
 	}
+
+
 
 
 	public function call_api($url){
