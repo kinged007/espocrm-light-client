@@ -1,6 +1,143 @@
 <?php
 namespace EspoCRMLightClient;
 
+/****************************************************************************
+ * Start class
+ */
+class Start {
+	private $base_url = "";
+	private $user = null;
+	private $pass = null;
+	
+	public $excludeEntities = [];
+
+	function __construct($url, $entities) {
+		session_start();
+		$this->views = new Views($this);
+		$this->router = new Router($this->views);
+		$this->excludeEntities = $entities;
+		$this->base_url = $url;
+
+		// Set routes
+		$this->router->add('/', 'index');
+		$this->router->add('/index', 'index');
+		$this->router->add('/entity', 'entity');
+		$this->router->add('/entity/:word:', 'view');
+		$this->router->add('/entity/:word:/:hex:', 'item');
+		$this->router->add('/sing_in', 'sing_in');
+
+		// Start client
+		$this->check_login();
+	}
+
+
+
+	public function call_api($url){
+		$curl = curl_init();
+
+		curl_setopt($curl, CURLOPT_URL, $this->base_url . $url);
+		curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
+		curl_setopt($curl, CURLOPT_HTTPHEADER, array(
+				'Espo-Authorization: '.base64_encode(
+					$this->user.':'.$this->pass
+				)
+		));
+
+		$curl_response = curl_exec($curl);
+		$curl_info = curl_getinfo($curl);
+		
+		curl_close($curl);
+
+		if ($curl_response === false) {
+			$this->views->render(
+				'error',
+				'<p><strong>Error occured during curl exec.</strong></p>
+				<p>Additional info:</p>
+				<pre>'. var_export($curl_info, true).'</pre>'
+			);
+			die();
+		
+		} else if($curl_info['http_code'] == '404'){
+			$this->views->render(
+				'error',
+				'<p><strong>404 Not found.</strong></p>
+				<p>Additional info:</p>
+				<pre>'.var_export($curl_info, true).'</pre>'
+			);
+			die();
+
+		}
+
+		return array(
+			'response' => $curl_response,
+			'info' => $curl_info,
+		);
+	}
+
+
+
+	private function check_login() {
+		// Is there a previous session?
+		if(isset($_SESSION['espo_user']) && isset($_SESSION['espo_token']) ){
+			$this->user = $_SESSION['espo_user'];
+			$this->pass = $_SESSION['espo_token'];
+		
+			// Is valid session?
+			$api = $this->call_api('App/user');
+			$resp = json_decode($api['response']);
+			$status = $api['info']['http_code'];
+
+			// Invalid session (Unauthorized)
+			if($status == '401') { 
+				$this->login("Session expired.");
+			
+			// Current session
+			} else {
+				$this->router->start();
+			}
+		
+		// There is no previous session
+		} else {
+			$this->login();
+		}
+	}
+
+
+	private function login($msg = '') {
+		// Send username and password?
+		if(isset($_POST['user']) && isset($_POST['pass'])){
+			
+			// Save user and pass
+			$this->user = $_POST['user'];
+			$this->pass = $_POST['pass'];
+
+			// Checks if the data are correct
+			$api = $this->call_api('App/user');
+			$resp = json_decode($api['response']);
+			$status = $api['info']['http_code'];
+
+			// Incorrect data
+			if($status == '401') {
+				$this->views->render('sing_in', 'User or password incorrect.');
+			
+			// Correct data
+			} else if($status == '200') {
+				$_SESSION['espo_user'] = $_POST['user'];
+				$_SESSION['espo_token'] = $resp->token;
+				$this->check_login();
+			}
+
+		} else {
+			$this->views->render('sing_in', $msg);
+		}
+	}
+}
+
+
+
+/****************************************************************************
+ * Router
+ */
 class Router {
 	private $routes = [];
 	private $views = [];
@@ -27,15 +164,12 @@ class Router {
 
 			preg_match ( '#^'.$route.'$#' , $curr_route, $matches);
 			if (count($matches) > 0) {
-				$this->views->render(
-					$view,
-					$matches
-				);
+				$this->views->render( $view, $matches );
 				$match = true;
 				break;
-			
 			} 
 		}
+
 		if(!$match) {
 			$this->views->render(
 				'error',
@@ -49,10 +183,9 @@ class Router {
 
 
 
-
-
-
-
+/****************************************************************************
+ * Views
+ */
 class Views {
 	private $client = null;
 	private $templates = null;
@@ -62,9 +195,13 @@ class Views {
 		$this->templates = new Templates();
 	}
 
+
+
 	public function render($view, $data = null) {
 		$this->$view($data);
 	}
+
+
 
 	private function replaceData($html, $data){
 		$tmp = $html;
@@ -87,6 +224,8 @@ class Views {
 		]);
 	}
 	
+
+
 	private function index() {
 		$tpl = $this->templates->getTemplate('index', true);
 		echo $this->replaceData($tpl, [
@@ -127,11 +266,16 @@ class Views {
 		$tpl = $this->templates->getTemplate('entity', true);
 		echo $this->replaceData($tpl, [
 			'subtitle' => 'Entities',
-			'breadcrumbs' => '<p class="breadcrumbs"><a href="?route=/">Home</a> > Entities</p>',
+			'breadcrumbs' => '
+				<p class="breadcrumbs">
+					<a href="?route=/">Home</a> > Entities
+				</p>',
 			'data' => $data,
 
 		]);
 	}
+
+
 
 	private function view($data) {
 		$exp = $data[1];
@@ -232,6 +376,8 @@ class Views {
 		]);
 	}
 
+
+
 	private function item($data) {
 		$exp = $data[1].'/'.$data[2];
 		$ent = $data[1];
@@ -260,10 +406,9 @@ class Views {
 
 
 
-
-
-
-
+/****************************************************************************
+ * Templates
+ */
 class Templates {
 	public function getTemplate($tpl, $wrap = false){
 		if ($wrap) {
@@ -374,149 +519,6 @@ class Templates {
 	private $list = '{{data}}';
 
 	private $item = '{{data}}';
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-class Init {
-	private $base_url = "";
-	private $user = null;
-	private $pass = null;
-	private $views = null;
-	
-	public $excludeEntities = [];
-
-
-
-	function __construct($url, $entities) {
-		session_start();
-		$this->views = new Views($this);
-		$this->router = new Router($this->views);
-		$this->excludeEntities = $entities;
-		$this->base_url = $url;
-
-		$this->router->add('/', 'index');
-		$this->router->add('/index', 'index');
-		$this->router->add('/entity', 'entity');
-		$this->router->add('/entity/:word:', 'view');
-		$this->router->add('/entity/:word:/:hex:', 'item');
-		$this->router->add('/sing_in', 'sing_in');
-
-		$this->check_login();
-	}
-
-
-
-
-	public function call_api($url){
-		$api_url = $this->base_url.$url;
-
-		$curl = curl_init();
-
-		curl_setopt($curl, CURLOPT_URL, $api_url);
-		curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
-		curl_setopt($curl, CURLOPT_HTTPHEADER, array(
-				'Espo-Authorization: '.base64_encode(
-					$this->user.':'.$this->pass
-				)
-		));
-
-		$curl_response = curl_exec($curl);
-		$curl_info = curl_getinfo($curl);
-		curl_close($curl);
-
-		if ($curl_response === false) {
-			$this->views->render(
-				'error',
-				'<p><strong>Error occured during curl exec.</strong></p><p>Additional info:</p><pre>'. 
-				var_export($curl_info, true).
-				'</pre>'
-			);
-			die();
-		
-		} else if($curl_info['http_code'] == '404'){
-			$this->views->render(
-				'error',
-				'<p><strong>404 Not found.</strong></p><p>Additional info:</p><pre>'. 
-				var_export($curl_info, true).
-				'</pre>'
-			);
-			die();
-
-		}
-
-		return array(
-			'response' => $curl_response,
-			'info' => $curl_info,
-			);
-	}
-
-	private function check_login() {
-		// Is there a previous session?
-		if(isset($_SESSION['espo_user']) && isset($_SESSION['espo_token']) ){
-			$this->user = $_SESSION['espo_user'];
-			$this->pass = $_SESSION['espo_token'];
-		
-			// Is valid session?
-			$api = $this->call_api('App/user');
-			$resp = json_decode($api['response']);
-			$status = $api['info']['http_code'];
-
-			// Invalid session (Unauthorized)
-			if($status == '401') { 
-				$this->login("Session expired.");
-			
-			// Current session
-			} else {
-				$this->router->start();
-			}
-		
-		// There is no previous session
-		} else {
-			$this->login();
-		}
-	}
-
-
-	private function login($msg = '') {
-		// Send username and password?
-		if(isset($_POST['user']) && isset($_POST['pass'])){
-			
-			// Save user and pass
-			$this->user = $_POST['user'];
-			$this->pass = $_POST['pass'];
-
-			// Checks if the data are correct
-			$api = $this->call_api('App/user');
-			$resp = json_decode($api['response']);
-			$status = $api['info']['http_code'];
-
-			// Incorrect data
-			if($status == '401') {
-				$this->views->render('sing_in', 'User or password incorrect.');
-			
-			// Correct data
-			} else if($status == '200') {
-				$_SESSION['espo_user'] = $_POST['user'];
-				$_SESSION['espo_token'] = $resp->token;
-				$this->check_login();
-			}
-
-		} else {
-			$this->views->render('sing_in', $msg);
-		}
-	}
 }
 
 ?>
