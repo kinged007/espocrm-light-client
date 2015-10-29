@@ -282,15 +282,25 @@ class Templates {
 			font-family: mono;
 			font-size: 14px;
 		}
+		h1 {
+			text-align: center;
+			font-size: 150%;
+		}
+		h2 {
+			text-align: center;
+			font-size: 125%;
+			font-weight: 400;
+		}
 	</style>
 </head>
 <body>
+<h1>EspoCRM Light Client</h1>
 ';
 		
 	private $footer = '</body></html>';
 	
 	private $sing_in = '
-<h1>Access to EspoCRM</h1>
+<h2>Access to EspoCRM</h2>
 <form method="POST">
 	<input type="text" placeholder="Username" name="user" />
 	<input type="password" placeholder="Password" name="pass" />
@@ -300,7 +310,7 @@ class Templates {
 ';
 
 	private $index = '
-<h1>Index</h1>
+<h2>Home</h2>
 <ul class="list">
 	<li><a href="?route=/entity">Entities</a></li>
 	<li><a href="?route=/addtask">Add Task</a></li>
@@ -308,17 +318,17 @@ class Templates {
 ';
 		
 	private $entity = '
-<h1>Entities</h1>
+<h2>Entities</h2>
 {{data}}
 ';
 	
 	private $list = '
-<h1>{{title}}</h1>
+<h2>{{title}}</h2>
 {{data}}
 ';
 
 	private $item = '
-<h1>{{title}}</h1>
+<h2>{{title}}</h2>
 {{data}}
 ';
 
