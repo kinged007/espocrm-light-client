@@ -215,34 +215,62 @@ class Views {
 
 
 
+	private function minify($html){
+		// http://stackoverflow.com/questions/6225351/how-to-minify-php-page-html-output
+		$search = array(
+			'/\>[^\S ]+/s',  // strip whitespaces after tags, except space
+			'/[^\S ]+\</s',  // strip whitespaces before tags, except space
+			'/(\s)+/s',       // shorten multiple whitespace sequences
+			'/(\t)+/s'       // shorten multiple tab sequences
+		);
+
+		$replace = array(
+			'>',
+			'<',
+			'\\1',
+			''
+		);
+
+		$html = preg_replace($search, $replace, $html);
+
+		return $html;
+	}
+
+
+
 	private function sing_in($msg) {
 		$tpl = $this->templates->getTemplate('sing_in', true);
-		echo $this->replaceData($tpl, [
+		$tpl = $this->replaceData($tpl, [
 			'subtitle' => 'Access to EspoCRM',
 			'breadcrumbs' => '',
 			'msg' => '<p><strong class="error">'.$msg.'</strong></p>'
 		]);
+		
+		echo $this->minify($tpl);
 	}
 	
 
 
 	private function index() {
 		$tpl = $this->templates->getTemplate('index', true);
-		echo $this->replaceData($tpl, [
+		$tpl = $this->replaceData($tpl, [
 			'breadcrumbs' => '',
 			'subtitle' => 'Home',
 			]);
+		
+		echo $this->minify($tpl);
 	}
 
 
 
 	private function error($msg = '') {
 		$tpl = $this->templates->getTemplate('list', true);
-		echo $this->replaceData($tpl, [
+		$tpl = $this->replaceData($tpl, [
 			'breadcrumbs' => '',
 			'subtitle' => '<strong class="error">ERROR</strong>',
 			'data' => $msg
 			]);
+		echo $this->minify($tpl);
 	}
 
 
@@ -264,7 +292,7 @@ class Views {
 		$data .= '</ul>';
 
 		$tpl = $this->templates->getTemplate('entity', true);
-		echo $this->replaceData($tpl, [
+		$tpl = $this->replaceData($tpl, [
 			'subtitle' => 'Entities',
 			'breadcrumbs' => '
 				<p class="breadcrumbs">
@@ -273,6 +301,8 @@ class Views {
 			'data' => $data,
 
 		]);
+
+		echo $this->minify($tpl);
 	}
 
 
@@ -365,7 +395,7 @@ class Views {
 		$list .= '</ul>';
 
 		$tpl = $this->templates->getTemplate('list', true);
-		echo $this->replaceData($tpl, [
+		$tpl = $this->replaceData($tpl, [
 			'data' => $list,
 			'subtitle' => $exp,
 			'breadcrumbs' => '<p class="breadcrumbs">
@@ -374,6 +404,8 @@ class Views {
 				'.$exp.'
 			</p>',
 		]);
+
+		echo $this->minify($tpl);
 	}
 
 
@@ -391,7 +423,7 @@ class Views {
 		$item .= '</pre>';
 
 		$tpl = $this->templates->getTemplate('item', true);
-		echo $this->replaceData($tpl, [
+		$tpl = $this->replaceData($tpl, [
 			'data' => $item,
 			'subtitle' => $itemAA,
 			'breadcrumbs' => '<p class="breadcrumbs">
@@ -401,6 +433,8 @@ class Views {
 				'.$itemAA.'
 			</p>',
 		]);
+
+		echo $this->minify($tpl);
 	}
 }
 
