@@ -23,41 +23,39 @@ class Views {
 		return $tmp;
 	}
 
+
+
 	private function sing_in($msg) {
 		$tpl = $this->templates->getTemplate('sing_in', true);
 		echo $this->replaceData($tpl, ['msg' => '<p><strong class="error">'.$msg.'</strong></p>']);
 	}
-	/*
-	private function index($data) {
-		$api = $this->client->call_api('Settings');
-		$resp = json_decode($api['response']);
-
-		$menu = '<ul class="list">';
-		foreach ($resp->tabList as $value) {
-			$menu .= '<li><a href="?acc=view&exp=' . $value . '">' . $value . 
-						'</a></li>';
-		}
-		$menu .= '</ul>';
-
-		//$this->render('index', null, $menu);
+	
+	private function index() {
+		$tpl = $this->templates->getTemplate('index', true);
+		echo $this->replaceData($tpl, []);
 	}
 
 
 	private function entity() {
-		$api = $this->call_api('Settings');
+		$api = $this->client->call_api('Settings');
 		$resp = json_decode($api['response']);
 
-		$menu = '<ul class="list">';
+		$data = '<ul class="list">';
 		foreach ($resp->tabList as $value) {
-			$menu .= '<li><a href="?acc=view&exp=' . $value . '">' . $value . 
+			$data .= '<li><a href="?acc=view&exp=' . $value . '">' . $value . 
 							'</a></li>';
 		}
-		$menu .= '</ul>';
+		$data .= '</ul>';
 
-		//$this->render('entity', null, $menu);
+		$tpl = $this->templates->getTemplate('entity', true);
+		echo $this->replaceData($tpl, ['data' => $data]);
 	}
 
-	private function view($exp) {
+	private function view() {
+		if(isset($_GET['exp'])){
+			$exp = $_GET['exp'];
+		}
+
 		$sort = 'sortBy=name&asc=true';
 
 		if ($exp == 'Email') {
@@ -67,7 +65,7 @@ class Views {
 			$sort = 'sortBy=createdAt&asc=false';
 		}
 		
-		$api = $this->call_api($exp.'?'.$sort);
+		$api = $this->client->call_api($exp.'?'.$sort);
 		$resp = json_decode($api['response']);
 
 		$list = '<ul class="list">';
@@ -130,11 +128,18 @@ class Views {
 		}
 		$list .= '</ul>';
 
-		//$this->render('list', $exp, $list);
+		$tpl = $this->templates->getTemplate('list', true);
+		echo $this->replaceData($tpl, [
+			'title' => $exp,
+			'data' => $list
+		]);
 	}
 
-	private function item($exp) {
-		echo "item";
+	private function item() {
+		if(isset($_GET['exp'])){
+			$exp = $_GET['exp'];
+		}
+
 		$api = $this->client->call_api($exp.'?sortBy=name&asc=true');
 		$resp = json_decode($api['response']);
 
@@ -142,11 +147,12 @@ class Views {
 		$item .= htmlentities(print_r($resp, true));
 		$item .= '</pre>';
 
-		//$this->client->render('item', $exp, $item);
+		$tpl = $this->templates->getTemplate('item', true);
+		echo $this->replaceData($tpl, [
+			'title' => $exp,
+			'data' => $item
+		]);
 	}
-	*/
-
-
 }
 
 
@@ -406,10 +412,6 @@ class EspoCRMLightClient {
 			
 		}
 
-		if(isset($_GET['exp'])){
-			$exp = $_GET['exp'];
-		}
-
 		if ($acc == 'index') {
 			$this->views->render('index');
 
@@ -420,7 +422,7 @@ class EspoCRMLightClient {
 			$this->views->render('sing_in');
 		
 		} else if ($acc == 'view') {
-			$this->views->render('item');
+			$this->views->render('view');
 		
 		} else if ($acc == 'item') {
 			$this->views->render('item');
