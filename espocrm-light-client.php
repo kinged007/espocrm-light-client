@@ -37,7 +37,12 @@ class Router {
 			} 
 		}
 		if(!$match) {
-			die('404 Route Not Found.');
+			$this->views->render(
+				'error',
+				'<p><strong>404 Route not found.</strong></p>
+				<p>Route "'.$curr_route.'" is not defined</p>'
+			);
+			die();
 		}
 	}
 }
@@ -75,7 +80,11 @@ class Views {
 
 	private function sing_in($msg) {
 		$tpl = $this->templates->getTemplate('sing_in', true);
-		echo $this->replaceData($tpl, ['msg' => '<p><strong class="error">'.$msg.'</strong></p>']);
+		echo $this->replaceData($tpl, [
+			'subtitle' => 'Access to EspoCRM',
+			'breadcrumbs' => '',
+			'msg' => '<p><strong class="error">'.$msg.'</strong></p>'
+		]);
 	}
 	
 	private function index() {
@@ -84,8 +93,19 @@ class Views {
 			'breadcrumbs' => '',
 			'subtitle' => 'Home',
 			]);
-		//
 	}
+
+
+
+	private function error($msg = '') {
+		$tpl = $this->templates->getTemplate('list', true);
+		echo $this->replaceData($tpl, [
+			'breadcrumbs' => '',
+			'subtitle' => '<strong class="error">ERROR</strong>',
+			'data' => $msg
+			]);
+	}
+
 
 
 	private function entity() {
@@ -381,7 +401,7 @@ class Init {
 
 	function __construct($url, $entities) {
 		session_start();
-		$this->views = new views($this);
+		$this->views = new Views($this);
 		$this->router = new Router($this->views);
 		$this->excludeEntities = $entities;
 		$this->base_url = $url;
@@ -400,39 +420,41 @@ class Init {
 
 
 	public function call_api($url){
-		$service_url = $this->base_url.$url;
+		$api_url = $this->base_url.$url;
 
-		$curl = curl_init($service_url);
+		$curl = curl_init();
 
+		curl_setopt($curl, CURLOPT_URL, $api_url);
 		curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
-		curl_setopt(
-			$curl, 
-			CURLOPT_HTTPHEADER, 
-			array(
+		curl_setopt($curl, CURLOPT_HTTPHEADER, array(
 				'Espo-Authorization: '.base64_encode(
 					$this->user.':'.$this->pass
 				)
-			)
-		);
+		));
 
 		$curl_response = curl_exec($curl);
 		$curl_info = curl_getinfo($curl);
+		curl_close($curl);
 
 		if ($curl_response === false) {
-			$info = curl_getinfo($curl);
-			curl_close($curl);
-			die(
-				'Error occured during curl exec. Additioanl info: ' . 
-				var_export($info)
+			$this->views->render(
+				'error',
+				'<p><strong>Error occured during curl exec.</strong></p><p>Additional info:</p><pre>'. 
+				var_export($curl_info, true).
+				'</pre>'
 			);
+			die();
 		
 		} else if($curl_info['http_code'] == '404'){
-			curl_close($curl);
-			die('404 Not found.'. print_r($curl_info,true));
+			$this->views->render(
+				'error',
+				'<p><strong>404 Not found.</strong></p><p>Additional info:</p><pre>'. 
+				var_export($curl_info, true).
+				'</pre>'
+			);
+			die();
 
 		}
-
-		curl_close($curl);
 
 		return array(
 			'response' => $curl_response,
@@ -453,8 +475,7 @@ class Init {
 
 			// Invalid session (Unauthorized)
 			if($status == '401') { 
-				$msg = "Session expired.";
-				$this->login();
+				$this->login("Session expired.");
 			
 			// Current session
 			} else {
@@ -468,7 +489,7 @@ class Init {
 	}
 
 
-	private function login() {
+	private function login($msg = '') {
 		// Send username and password?
 		if(isset($_POST['user']) && isset($_POST['pass'])){
 			
@@ -493,8 +514,7 @@ class Init {
 			}
 
 		} else {
-			//$msg = '<strong class="error">'.$_GET["msg"].'</strong>';
-			$this->views->render('sing_in');
+			$this->views->render('sing_in', $msg);
 		}
 	}
 }
