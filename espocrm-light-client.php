@@ -41,6 +41,12 @@ class Router {
 	}
 }
 
+
+
+
+
+
+
 class Views {
 	private $client = null;
 	private $templates = null;
@@ -73,7 +79,11 @@ class Views {
 	
 	private function index() {
 		$tpl = $this->templates->getTemplate('index', true);
-		echo $this->replaceData($tpl, []);
+		echo $this->replaceData($tpl, [
+			'breadcrumbs' => '',
+			'subtitle' => 'Home',
+			]);
+		//
 	}
 
 
@@ -94,7 +104,12 @@ class Views {
 		$data .= '</ul>';
 
 		$tpl = $this->templates->getTemplate('entity', true);
-		echo $this->replaceData($tpl, ['data' => $data]);
+		echo $this->replaceData($tpl, [
+			'subtitle' => 'Entities',
+			'breadcrumbs' => '<p class="breadcrumbs"><a href="?route=/">Home</a> > Entities</p>',
+			'data' => $data,
+
+		]);
 	}
 
 	private function view($data) {
@@ -186,13 +201,20 @@ class Views {
 
 		$tpl = $this->templates->getTemplate('list', true);
 		echo $this->replaceData($tpl, [
-			'title' => $exp,
-			'data' => $list
+			'data' => $list,
+			'subtitle' => $exp,
+			'breadcrumbs' => '<p class="breadcrumbs">
+				<a href="?route=/">Home</a> > 
+				<a href="?route=/entity">Entities</a> > 
+				'.$exp.'
+			</p>',
 		]);
 	}
 
 	private function item($data) {
 		$exp = $data[1].'/'.$data[2];
+		$ent = $data[1];
+		$itemAA = $data[2];
 
 		$api = $this->client->call_api($exp.'?sortBy=name&asc=true');
 		$resp = json_decode($api['response']);
@@ -203,8 +225,14 @@ class Views {
 
 		$tpl = $this->templates->getTemplate('item', true);
 		echo $this->replaceData($tpl, [
-			'title' => $exp,
-			'data' => $item
+			'data' => $item,
+			'subtitle' => $itemAA,
+			'breadcrumbs' => '<p class="breadcrumbs">
+				<a href="?route=/">Home</a> > 
+				<a href="?route=/entity">Entities</a> > 
+				<a href="?route=/entity/'.$ent.'">'.$ent.'</a> > 
+				'.$itemAA.'
+			</p>',
 		]);
 	}
 }
@@ -236,7 +264,7 @@ class Templates {
 		user-scalable=no, initial-scale=1, maximum-scale=1">
 
 	<style>
-		* {
+		body {
 			font-family: sans-serif;
 			font-size: 18px;
 		}
@@ -284,23 +312,27 @@ class Templates {
 		}
 		h1 {
 			text-align: center;
-			font-size: 150%;
+			font-size: 1.5em;
 		}
 		h2 {
 			text-align: center;
-			font-size: 125%;
+			font-size: 1.25em;
 			font-weight: 400;
+		}
+		.breadcrumbs {
+			font-size: .8em;
 		}
 	</style>
 </head>
 <body>
 <h1>EspoCRM Light Client</h1>
+<h2>{{subtitle}}</h2>
+{{breadcrumbs}}
 ';
 		
 	private $footer = '</body></html>';
 	
 	private $sing_in = '
-<h2>Access to EspoCRM</h2>
 <form method="POST">
 	<input type="text" placeholder="Username" name="user" />
 	<input type="password" placeholder="Password" name="pass" />
@@ -310,28 +342,17 @@ class Templates {
 ';
 
 	private $index = '
-<h2>Home</h2>
 <ul class="list">
 	<li><a href="?route=/entity">Entities</a></li>
 	<li><a href="?route=/addtask">Add Task</a></li>
 </ul>
 ';
 		
-	private $entity = '
-<h2>Entities</h2>
-{{data}}
-';
+	private $entity = '{{data}}';
 	
-	private $list = '
-<h2>{{title}}</h2>
-{{data}}
-';
+	private $list = '{{data}}';
 
-	private $item = '
-<h2>{{title}}</h2>
-{{data}}
-';
-
+	private $item = '{{data}}';
 }
 
 
