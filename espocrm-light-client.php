@@ -1,4 +1,5 @@
 <?php
+namespace EspoCRMLightClient;
 
 class Router {
 	private $routes = [];
@@ -368,7 +369,7 @@ class Templates {
 
 
 
-class EspoCRMLightClient {
+class Init {
 	private $base_url = "";
 	private $user = null;
 	private $pass = null;
