@@ -188,11 +188,9 @@ class Router {
  */
 class Views {
 	private $client = null;
-	private $templates = null;
 	
 	function __construct($espoclient) {
 		$this->client = $espoclient;
-		$this->templates = new Templates();
 	}
 
 
@@ -203,63 +201,26 @@ class Views {
 
 
 
-	private function replaceData($html, $data){
-		$tmp = $html;
+	private function index() {
+		$tpl = new Template();
+		$tpl->tpl('index');
+		$tpl->data([ 'breadcrumbs' => '', 'subtitle' => 'Home']);
 
-		foreach ($data as $key => $val) {
-			$tmp = str_replace('{{'.$key.'}}', $val, $tmp);
-		}
-		
-		return $tmp;
+		$tpl->deploy();
 	}
 
 
-
-	private function minify($html){
-		// http://stackoverflow.com/questions/6225351/how-to-minify-php-page-html-output
-		$search = array(
-			'/\>[^\S ]+/s',  // strip whitespaces after tags, except space
-			'/[^\S ]+\</s',  // strip whitespaces before tags, except space
-			'/(\s)+/s',       // shorten multiple whitespace sequences
-			'/(\t)+/s'       // shorten multiple tab sequences
-		);
-
-		$replace = array(
-			'>',
-			'<',
-			'\\1',
-			''
-		);
-
-		$html = preg_replace($search, $replace, $html);
-
-		return $html;
-	}
-
-
-
-	private function sing_in($msg) {
+	/*private function sing_in($msg) {
 		$tpl = $this->templates->getTemplate('sing_in', true);
 		$tpl = $this->replaceData($tpl, [
 			'subtitle' => 'Access to EspoCRM',
 			'breadcrumbs' => '',
 			'msg' => '<p><strong class="error">'.$msg.'</strong></p>'
 		]);
-		
+
 		echo $this->minify($tpl);
 	}
-	
 
-
-	private function index() {
-		$tpl = $this->templates->getTemplate('index', true);
-		$tpl = $this->replaceData($tpl, [
-			'breadcrumbs' => '',
-			'subtitle' => 'Home',
-			]);
-		
-		echo $this->minify($tpl);
-	}
 
 
 
@@ -435,7 +396,7 @@ class Views {
 		]);
 
 		echo $this->minify($tpl);
-	}
+	}*/
 }
 
 
@@ -443,116 +404,189 @@ class Views {
 /****************************************************************************
  * Templates
  */
-class Templates {
-	public function getTemplate($tpl, $wrap = false){
-		if ($wrap) {
-			return $this->header.$this->$tpl.$this->footer;
-		} else {
-			return $this->$tpl;
+class Template {
+	private $data = [];
+	private $minify = true;
+	private $wrap = true;
+	private $html = '';
+	private $tpl = 'base';
+
+	public function wrap($value=true) {
+		$this->wrap = $value;
+	}
+
+	public function data($value=[]) {
+		$this->data = $value;
+	}
+
+	public function minify($value=true) {
+		$this->minify = $value;
+	}
+	
+	public function html($value='') {
+		$this->html = $value;
+	}
+	
+	public function tpl($value='') {
+		$this->tpl = $value;
+	}
+
+	public function deploy() {
+		$html = $this->templates[$this->tpl];
+		
+		if ($this->wrap) { 
+			$html = $this->templates['header'] . 
+						$html . 
+						$this->templates['footer']; 
 		}
+
+		if (!empty($this->data)){
+			$html = $this->replaceData($html);
+		}
+
+		if ($this->minify){
+			$html = $this->doMinify($html);
+		}
+		
+		echo $html;
 	}
 
 
-	private $header = '<!DOCTYPE html>
-<html lang="es">
-<head>
-	<meta charset="utf-8">
-	<meta http-equiv="Content-Type" content="text/html; 
-		charset=UTF-8">
-	<title>EspoCRM - Mobile</title>
-	<meta name="viewport" content="width=device-width, 
-		user-scalable=no, initial-scale=1, maximum-scale=1">
 
-	<style>
-		body {
-			font-family: sans-serif;
-			font-size: 18px;
+	private function replaceData($html){
+		$tmp = $html;
+
+		foreach ($this->data as $key => $val) {
+			$tmp = str_replace('{{'.$key.'}}', $val, $tmp);
 		}
-		input {
-			width: 96%;
-			display: block;
-			margin: 0 0 20px 0;
-			padding: 0 2%;
-			height: 40px;
-			line-height: 40px;
-			border: 1px solid #8CBA18;
-		}
-		input[type="submit"] {
-			border: none;
-			background-color: #8CBA18;
-			color: #fff;
-			padding: 0;
-			width: 100%;
-		}
-		.error {
-			color: red;
-		}
-		.list {
-			list-style: none;
-			margin: 0;
-			padding: 0;
-			border-top: 1px solid #8CBA18;
-		}
-		.list li {
-			border-bottom: 1px solid #8CBA18;
-		}
-		.list li a {
-			line-height: 26px;
-			padding: 15px 20px;
-			color: #000;
-			display: block;
-			text-decoration: none;
-			white-space: nowrap;
-			text-overflow: ellipsis;
-			overflow: hidden;
-		}
-		pre {
-			font-family: mono;
-			font-size: 14px;
-		}
-		h1 {
-			text-align: center;
-			font-size: 1.5em;
-		}
-		h2 {
-			text-align: center;
-			font-size: 1.25em;
-			font-weight: 400;
-		}
-		.breadcrumbs {
-			font-size: .8em;
-		}
-	</style>
-</head>
-<body>
-<h1>EspoCRM Light Client</h1>
-<h2>{{subtitle}}</h2>
-{{breadcrumbs}}
-';
 		
-	private $footer = '</body></html>';
-	
-	private $sing_in = '
-<form method="POST">
-	<input type="text" placeholder="Username" name="user" />
-	<input type="password" placeholder="Password" name="pass" />
-	{{msg}}
-	<input type="submit" value="Sing In" />
-</form>
-';
+		return $tmp;
+	}
 
-	private $index = '
-<ul class="list">
-	<li><a href="?route=/entity">Entities</a></li>
-	<li><a href="?route=/addtask">Add Task</a></li>
-</ul>
-';
-		
-	private $entity = '{{data}}';
-	
-	private $list = '{{data}}';
 
-	private $item = '{{data}}';
+
+	private function doMinify($html){
+		// http://stackoverflow.com/questions/6225351/how-to-minify-php-page-html-output
+		$search = array(
+			'/\>[^\S ]+/s',  // strip whitespaces after tags, except space
+			'/[^\S ]+\</s',  // strip whitespaces before tags, except space
+			'/(\s)+/s',       // shorten multiple whitespace sequences
+			'/(\t)+/s'       // shorten multiple tab sequences
+		);
+
+		$replace = array(
+			'>',
+			'<',
+			'\\1',
+			''
+		);
+
+		$html = preg_replace($search, $replace, $html);
+
+		return $html;
+	}
+
+
+
+	private $templates = [
+		'base' => '{{data}}',
+
+		'header' => '
+			<!DOCTYPE html>
+			<html lang="es">
+			<head>
+				<meta charset="utf-8">
+				<meta http-equiv="Content-Type" content="text/html; 
+					charset=UTF-8">
+				<title>EspoCRM - Mobile</title>
+				<meta name="viewport" content="width=device-width, 
+					user-scalable=no, initial-scale=1, maximum-scale=1">
+
+				<style>
+					body {
+						font-family: sans-serif;
+						font-size: 18px;
+					}
+					input {
+						width: 96%;
+						display: block;
+						margin: 0 0 20px 0;
+						padding: 0 2%;
+						height: 40px;
+						line-height: 40px;
+						border: 1px solid #8CBA18;
+					}
+					input[type="submit"] {
+						border: none;
+						background-color: #8CBA18;
+						color: #fff;
+						padding: 0;
+						width: 100%;
+					}
+					.error {
+						color: red;
+					}
+					.list {
+						list-style: none;
+						margin: 0;
+						padding: 0;
+						border-top: 1px solid #8CBA18;
+					}
+					.list li {
+						border-bottom: 1px solid #8CBA18;
+					}
+					.list li a {
+						line-height: 26px;
+						padding: 15px 20px;
+						color: #000;
+						display: block;
+						text-decoration: none;
+						white-space: nowrap;
+						text-overflow: ellipsis;
+						overflow: hidden;
+					}
+					pre {
+						font-family: mono;
+						font-size: 14px;
+					}
+					h1 {
+						text-align: center;
+						font-size: 1.5em;
+					}
+					h2 {
+						text-align: center;
+						font-size: 1.25em;
+						font-weight: 400;
+					}
+					.breadcrumbs {
+						font-size: .8em;
+					}
+				</style>
+			</head>
+			<body>
+			<h1>EspoCRM Light Client</h1>
+			<h2>{{subtitle}}</h2>
+			{{breadcrumbs}}
+		',
+
+		'footer' => '</body></html>',
+
+		'index' => '
+			<ul class="list">
+				<li><a href="?route=/entity">Entities</a></li>
+				<li><a href="?route=/addtask">Add Task</a></li>
+			</ul>
+		',
+
+		'sing_in' => '
+			<form method="POST">
+				<input type="text" placeholder="Username" name="user" />
+				<input type="password" placeholder="Password" name="pass" />
+				{{msg}}
+				<input type="submit" value="Sing In" />
+			</form>
+		'
+	];
 }
 
 ?>
