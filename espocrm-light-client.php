@@ -156,8 +156,19 @@ class Views {
 					" " . $value->accountName;
 			
 			} else if ($exp == 'Email') {
-				$showName = $value->fromString . "<br />&gt;&gt;&gt; " . 
-				$value->name;
+				$showName = '';
+				if ($value->isRead == '') { $showName .= '<strong>'; }
+				if ($value->isImportant == 1) { $showName .= '&#9733; '; }
+	
+				if (isset($value->personStringData)){
+					$showName .= $value->personStringData;
+				
+				} else {
+					$showName .= $value->fromString;
+				}
+				
+				if ($value->isRead == '') { $showName .= '</strong>'; }
+				$showName .= "<br />&gt;&gt;&gt; ".$value->name;
 			}
 			
 			if ($show) {
