@@ -5,7 +5,7 @@ class EspoCRMLightClient {
 	private $base_url = "";
 	private $user = null;
 	private $pass = null;
-	
+
 
 
 	function __construct($url) {
@@ -13,7 +13,6 @@ class EspoCRMLightClient {
 		$this->base_url = $url;
 
 		$this->check_login();
-		$this->router();
 	}
 
 
@@ -51,30 +50,70 @@ class EspoCRMLightClient {
 	}
 
 	private function check_login() {
-		$login = false;
-		$msg = '';
-		
-		if(isset($_SESSION['espo_user']) || isset($_SESSION['espo_token']) ){
+		// Is there a previous session?
+		if(isset($_SESSION['espo_user']) && isset($_SESSION['espo_token']) ){
 			$this->user = $_SESSION['espo_user'];
 			$this->pass = $_SESSION['espo_token'];
 		
+			// Is valid session?
 			$api = $this->call_api('App/user');
 			$resp = json_decode($api['response']);
 			$status = $api['info']['http_code'];
-			
+
+			// Invalid session (Unauthorized)
 			if($status == '401') { 
 				$msg = "Session expired.";
+				$this->login();
+			
+			// Current session
 			} else {
-				$login = true;
+				$this->router();
 			}
+		
+		// There is no previous session
+		} else {
+			$this->login();
 		}
-
-		if(!$login && isset($_GET['acc']) && $_GET['acc'] != 'sing_in'){
-			header('Location: ?acc=sing_in&msg='.$msg);
-			die();
-		}
-
 	}
+
+
+	private function login() {
+
+		// Send username and password?
+		if(isset($_POST['user']) && isset($_POST['pass'])){
+			
+			// Save user and pass
+			$this->user = $_POST['user'];
+			$this->pass = $_POST['pass'];
+
+			// Checks if the data are correct
+			$api = $this->call_api('App/user');
+			$resp = json_decode($api['response']);
+			$status = $api['info']['http_code'];
+
+			// Incorrect data
+			if($status == '401') {
+				//$msg = '<strong class="error">User or password incorrect.</strong>';
+				$this->render('sing_in');
+			
+			// Correct data
+			} else if($status == '200') {
+				$_SESSION['espo_user'] = $_POST['user'];
+				$_SESSION['espo_token'] = $resp->token;
+				$this->check_login();
+			}
+
+		} else {
+			//$msg = '<strong class="error">'.$_GET["msg"].'</strong>';
+			$this->render('sing_in');
+		}
+	}
+
+
+
+
+
+
 
 	function router() {
 		if(!isset($_GET['acc']) || $_GET['acc'] == '' ){
@@ -134,34 +173,7 @@ class EspoCRMLightClient {
 	 */
 
 	function sing_in(){
-		$msg = '';
-
-		if(isset($_POST['user']) && isset($_POST['pass'])){
-			$this->user = $_POST['user'];
-			$this->pass = $_POST['pass'];
-
-			$api = $this->call_api('App/user');
-			$resp = json_decode($api['response']);
-			$status = $api['info']['http_code'];
-
-			if($status == '401') {
-				$msg = '<strong class="error">User or password incorrect.</strong>';
-			
-			} else if($status == '200') {
-				$_SESSION['espo_user'] = $_POST['user'];
-				$_SESSION['espo_token'] = $resp->token;
-				header('Location: ?exp=index');
-				die();
-			}
-		} else {
-			if (isset($_GET["msg"]) && $_GET["msg"] != '') {
-				$msg = '<strong class="error">'.$_GET["msg"].'</strong>';
-			}
-		}
-
-		$this->render('sing_in');
-
-		echo $msg;
+		echo "login form";
 	}
 
 
