@@ -38,9 +38,9 @@ class Start {
 		curl_setopt($curl, CURLOPT_URL, $this->base_url . $url);
 		curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
 		curl_setopt($curl, CURLOPT_HTTPHEADER, array(
-				'Espo-Authorization: '.base64_encode(
-					$this->user.':'.$this->pass
-				)
+			'Espo-Authorization: '.base64_encode(
+				$this->user.':'.$this->pass
+			)
 		));
 
 		$curl_response = curl_exec($curl);
@@ -204,7 +204,6 @@ class Views {
 	private function error($msg = '') {
 		$tpl = new Template();
 		$tpl->data([ 
-			'breadcrumbs' => '', 
 			'subtitle' => '<strong class="error">ERROR</strong>',
 			'data' => $msg
 		]);
@@ -214,7 +213,7 @@ class Views {
 
 
 	// *** Views ***
-	
+
 	private function entity() {
 		$api = $this->client->call_api('Settings');
 		$resp = json_decode($api['response']);
@@ -234,14 +233,8 @@ class Views {
 		$data .= '</ul>';		
 
 		$tpl = new Template();
-		$tpl->data([ 
-			'breadcrumbs' => '
-				<p class="breadcrumbs">
-					<a href="?route=/">Home</a> > Entities
-				</p>', 
-			'subtitle' => 'Entities',
-			'data' => $data,
-		]);
+		$tpl->breadcrumbs(['Entities']);
+		$tpl->data([ 'subtitle' => 'Entities', 'data' => $data ]);
 
 		$tpl->deploy();
 	}
@@ -251,7 +244,7 @@ class Views {
 	private function index() {
 		$tpl = new Template();
 		$tpl->tpl('index');
-		$tpl->data([ 'breadcrumbs' => '', 'subtitle' => 'Home']);
+		$tpl->data([ 'subtitle' => 'Home']);
 
 		$tpl->deploy();
 	}
@@ -365,12 +358,11 @@ class Views {
 		$list .= '</ul>';
 
 		$tpl = new Template();
+		$tpl->breadcrumbs([
+			'<a href="?route=/entity">Entities</a>',
+			$entity
+		]);
 		$tpl->data([ 
-			'breadcrumbs' => '<p class="breadcrumbs">
-				<a href="?route=/">Home</a> > 
-				<a href="?route=/entity">Entities</a> >&nbsp;
-				'.$entity.'
-			</p>', 
 			'subtitle' => $entity,
 			'data' => $list,
 		]);
@@ -395,13 +387,12 @@ class Views {
 		$single  = '<pre>'.$single.'</pre>';
 
 		$tpl = new Template();
-		$tpl->data([ 
-			'breadcrumbs' => '<p class="breadcrumbs">
-				<a href="?route=/">Home</a> > 
-				<a href="?route=/entity">Entities</a> > 
-				<a href="?route=/entity/'.$entity.'">'.$entity.'</a> >&nbsp; 
-				'.$resp->name.'
-			</p>', 
+		$tpl->breadcrumbs([
+			'<a href="?route=/entity">Entities</a>',
+			'<a href="?route=/entity/'.$entity.'">'.$entity.'</a>',
+			$resp->name
+		]);
+		$tpl->data([
 			'subtitle' => $resp->name,
 			'data' => $single,
 		]);
@@ -415,7 +406,6 @@ class Views {
 		$tpl = new Template();
 		$tpl->tpl('sing_in');
 		$tpl->data([ 
-			'breadcrumbs' => '', 
 			'subtitle' => 'Access to EspoCRM',
 			'msg' => '<p><strong class="error">'.$msg.'</strong></p>'
 		]);
@@ -431,6 +421,7 @@ class Views {
  */
 class Template {
 	private $data = [];
+	private $breadcrumbs = [];
 	private $minify = true;
 	private $wrap = true;
 	private $html = '';
@@ -438,6 +429,10 @@ class Template {
 
 	public function wrap($value=true) {
 		$this->wrap = $value;
+	}
+	
+	public function breadcrumbs($value=[]) {
+		$this->breadcrumbs = $value;
 	}
 
 	public function data($value=[]) {
@@ -460,15 +455,17 @@ class Template {
 		$html = $this->templates[$this->tpl];
 		
 		if ($this->wrap) { 
-			$html = $this->templates['header'] . 
-						$html . 
-						$this->templates['footer']; 
+			$wrap  = $this->templates['header'];
+			$wrap .= $html;
+			$wrap .= $this->templates['footer']; 
+
+			$html = $wrap;
 		}
 
 		if (!empty($this->data)){
 			$html = $this->replaceData($html);
 		}
-
+		
 		if ($this->minify){
 			$html = $this->doMinify($html);
 		}
@@ -485,7 +482,36 @@ class Template {
 			$tmp = str_replace('{{'.$key.'}}', $val, $tmp);
 		}
 		
+		if (!empty($this->breadcrumbs)){
+			$tmp = str_replace(
+				'{{breadcrumbs}}', 
+				$this->doBreadCrumbs($this->breadcrumbs),
+				$tmp
+			);
+		} else {
+			$tmp = str_replace(	'{{breadcrumbs}}', '', $tmp);
+		}
+		
 		return $tmp;
+	}
+
+
+
+	private function doBreadCrumbs($items){
+		$html  = '<p class="breadcrumbs">';
+		$html .= '<a href="?route=/">Home</a> > ';
+		
+		$len = count($items);
+		$i = 0;
+		foreach ($items as $value) {
+			$html .= $value;
+			if ($i != $len - 1) { $html .= ' > '; }
+			$i++;
+		}
+		
+		$html .= '</p>';
+
+		return $html;
 	}
 
 
