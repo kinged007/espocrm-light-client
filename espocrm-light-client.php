@@ -25,6 +25,7 @@ class Start {
 		$this->router->add('/entity/:word:', 'item_list');
 		$this->router->add('/entity/:word:/:hex:', 'item_single');
 		$this->router->add('/sing_in', 'sing_in');
+		$this->router->add('/addtask', 'addtask');
 
 		// Start client
 		$this->check_login();
@@ -32,16 +33,27 @@ class Start {
 
 
 
-	public function call_api($url){
+	public function call_api($url, $post = false, $data = ''){
 		$curl = curl_init();
+		$headers = [];
 
 		curl_setopt($curl, CURLOPT_URL, $this->base_url . $url);
 		curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
-		curl_setopt($curl, CURLOPT_HTTPHEADER, array(
+		
+		array_push(
+			$headers, 
 			'Espo-Authorization: '.base64_encode(
 				$this->user.':'.$this->pass
 			)
-		));
+		);
+		
+		if ($post) {
+			curl_setopt($curl, CURLOPT_POST, true);
+			array_push($headers, 'Content-Type: application/json');
+			curl_setopt($curl, CURLOPT_POSTFIELDS, $data);
+		}
+		
+		curl_setopt($curl, CURLOPT_HTTPHEADER, $headers);
 
 		$curl_response = curl_exec($curl);
 		$curl_info = curl_getinfo($curl);
@@ -197,6 +209,50 @@ class Views {
 
 	public function render($view, $data = null) {
 		$this->$view($data);
+	}
+
+
+
+	private function addtask() {
+		$return = '';
+		
+		if(isset($_POST['addtask'])){
+			$data = json_encode([
+				'assignedUserId' => $_POST['assignedUserId'],
+				'name' => $_POST['name'],
+				'status' => $_POST['status'],
+				'priority' => $_POST['priority'],
+				'dateStart' => $_POST['year'].'-'.$_POST['month'].'-'.$_POST['day'].' 00:00:00',
+				'description' => $_POST['description'],
+			]);
+
+			$api = $this->client->call_api('Task', true, $data);
+
+			$return  = print_r(json_decode($api['response']),true);
+			$return  = print_r($return, true);
+			$return  = htmlentities($return);
+			$return  = str_replace(" ", "&nbsp;", $return);
+			$return  = nl2br($return);
+			$return  = '<pre>'.$return.'</pre>';
+		}
+
+		$api = $this->client->call_api('App/user');
+		$resp = json_decode($api['response']);
+		$user_id = $resp->user->id;
+
+		$tpl = new Template();
+		$tpl->tpl('addtask');
+		$tpl->breadcrumbs(['Add Task']);
+		$tpl->data([ 
+			'subtitle' => 'Add Task',
+			'user_id' => $user_id,
+			'day' => date('d'),
+			'month' => date('m'),
+			'year' => date('Y'),
+			'return' => $return,
+		]);
+
+		$tpl->deploy();
 	}
 
 
@@ -542,6 +598,36 @@ class Template {
 	private $templates = [
 		'base' => '{{data}}',
 
+		'addtask' => '
+			<form method="POST">
+				<input type="hidden" name="assignedUserId" value="{{user_id}}" />
+				<input type="hidden" name="addtask" value="1" />
+				<input type="text" placeholder="Subject" name="name" />
+				<select name="status"> 
+					<option value="Not Started">Sin Empezar</option>
+					<option value="Started">Started</option>
+					<option value="Completed">Completed</option>
+					<option value="Canceled">Canceled</option>
+					<option value="Deferred">Deferred</option>
+				</select>
+				
+				<select name="priority"> 
+					<option value="Low">Low</option>
+					<option value="Normal" selected="">Normal</option>
+					<option value="High">High</option>
+					<option value="Urgent">Urgent</option>
+				</select>
+				<div class="group">
+					<input type="text" placeholder="Day" name="day" size="2" value="{{day}}" />
+					<input type="text" placeholder="Month" name="month" size="2" value="{{month}}" />
+					<input type="text" placeholder="Year" name="year" size="2" value="{{year}}" />
+				</div>
+				<textarea placeholder="Description" name="description"></textarea>
+				<input type="submit" value="Add Task" />
+			</form>
+			{{return}}
+		',
+
 		'header' => '
 			<!DOCTYPE html>
 			<html lang="es">
@@ -558,7 +644,7 @@ class Template {
 						font-family: sans-serif;
 						font-size: 18px;
 					}
-					input {
+					input, textarea, select {
 						width: 96%;
 						display: block;
 						margin: 0 0 20px 0;
@@ -566,6 +652,15 @@ class Template {
 						height: 40px;
 						line-height: 40px;
 						border: 1px solid #8CBA18;
+						font-size: 1em;
+					}
+					textarea {
+						height: 120px;
+					}
+					select {
+						width: 100%;
+						background-color: #fff;
+						border-radius: 0;
 					}
 					input[type="submit"] {
 						border: none;
@@ -611,6 +706,13 @@ class Template {
 					}
 					.breadcrumbs {
 						font-size: .8em;
+					}
+					.group input {
+						width: 26.5%;
+						display: inline-block;
+						text-align: center;
+						margin-left: 1%;
+						margin-right: 1%;
 					}
 				</style>
 			</head>
