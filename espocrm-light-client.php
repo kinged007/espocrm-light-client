@@ -22,8 +22,8 @@ class Start {
 		$this->router->add('/', 'index');
 		$this->router->add('/index', 'index');
 		$this->router->add('/entity', 'entity');
-		$this->router->add('/entity/:word:', 'view');
-		$this->router->add('/entity/:word:/:hex:', 'item');
+		$this->router->add('/entity/:word:', 'item_list');
+		$this->router->add('/entity/:word:/:hex:', 'item_single');
 		$this->router->add('/sing_in', 'sing_in');
 
 		// Start client
@@ -201,6 +201,53 @@ class Views {
 
 
 
+	private function error($msg = '') {
+		$tpl = new Template();
+		$tpl->data([ 
+			'breadcrumbs' => '', 
+			'subtitle' => '<strong class="error">ERROR</strong>',
+			'data' => $msg
+		]);
+
+		$tpl->deploy();
+	}
+
+
+	// *** Views ***
+	
+	private function entity() {
+		$api = $this->client->call_api('Settings');
+		$resp = json_decode($api['response']);
+
+		$entities = $resp->tabList;
+		$entities = array_filter($entities, function($var){
+			return !in_array($var, $this->client->excludeEntities);
+		});
+		sort($entities);
+
+		$data = '<ul class="list">';
+		foreach ($entities as $entity) {
+			$data .= '<li>';
+			$data .= '<a href="?route=/entity/'.$entity.'">'.$entity.'</a>';
+			$data .= '</li>';
+		}
+		$data .= '</ul>';		
+
+		$tpl = new Template();
+		$tpl->data([ 
+			'breadcrumbs' => '
+				<p class="breadcrumbs">
+					<a href="?route=/">Home</a> > Entities
+				</p>', 
+			'subtitle' => 'Entities',
+			'data' => $data,
+		]);
+
+		$tpl->deploy();
+	}
+
+
+
 	private function index() {
 		$tpl = new Template();
 		$tpl->tpl('index');
@@ -210,193 +257,171 @@ class Views {
 	}
 
 
-	/*private function sing_in($msg) {
-		$tpl = $this->templates->getTemplate('sing_in', true);
-		$tpl = $this->replaceData($tpl, [
-			'subtitle' => 'Access to EspoCRM',
-			'breadcrumbs' => '',
-			'msg' => '<p><strong class="error">'.$msg.'</strong></p>'
-		]);
 
-		echo $this->minify($tpl);
-	}
+	private function item_list($data) {
+		$entity = $data[1];
 
-
-
-
-	private function error($msg = '') {
-		$tpl = $this->templates->getTemplate('list', true);
-		$tpl = $this->replaceData($tpl, [
-			'breadcrumbs' => '',
-			'subtitle' => '<strong class="error">ERROR</strong>',
-			'data' => $msg
-			]);
-		echo $this->minify($tpl);
-	}
-
-
-
-	private function entity() {
-		$api = $this->client->call_api('Settings');
-		$resp = json_decode($api['response']);
-
-		sort($resp->tabList);
-
-		$data = '<ul class="list">';
-		foreach ($resp->tabList as $value) {
-			if (!in_array($value, $this->client->excludeEntities)) {
-				$data .= '<li><a href="?route=/entity/'.$value.'">
-							' . $value . '
-						</a></li>';
-			}
-		}
-		$data .= '</ul>';
-
-		$tpl = $this->templates->getTemplate('entity', true);
-		$tpl = $this->replaceData($tpl, [
-			'subtitle' => 'Entities',
-			'breadcrumbs' => '
-				<p class="breadcrumbs">
-					<a href="?route=/">Home</a> > Entities
-				</p>',
-			'data' => $data,
-
-		]);
-
-		echo $this->minify($tpl);
-	}
-
-
-
-	private function view($data) {
-		$exp = $data[1];
+		// Sort
 		$sort = 'sortBy=name&asc=true';
-
-		if ($exp == 'Email') {
+		if ($entity == 'Email') {
 			$sort = 'sortBy=dateSent&asc=false';
 		
-		} else if ($exp == 'Receipts') {
+		} else if ($entity == 'Receipts') {
 			$sort = 'sortBy=createdAt&asc=false';
 		}
 		
-		$api = $this->client->call_api($exp.'?'.$sort);
+		// Call API
+		$api = $this->client->call_api($entity.'?'.$sort);
 		$resp = json_decode($api['response']);
 
-		$list = '<ul class="list">';
-		foreach ($resp->list as $value) {
-			$show = true;
-			
-			if ($exp == 'Lead') { 
-				if (in_array(
-						$value->status, 
-						['Converted', 'Recycled', 'Dead']
-					)){
-					$show = false;
-				}
-			
-			} else if ($exp == 'Opportunity') {
-				if (in_array($value->stage, ['Closed Won', 'Closed Lost'])){
-					$show = false;
-				}
-			} else if ($exp == 'Project') {
-				if (
-					$value->status != 'Not Started' && 
-					$value->status != 'Started'
-				){
-					$show = false;
-				}
-			} else if ($exp == 'Meeting' || $exp == 'Call') {
-				if ($value->status != 'Planned'){
-					$show = false;
-				}
-			} else if ($exp == 'Task') {
-				if (in_array($value->status, ['Completed', 'Canceled'])){
-					$show = false;
-				}
-			} else if ($exp == 'Email') {
-				if ($value->status != 'Archived'){
-					$show = false;
-				}
-			}
-			
+		// Filter items
+		$items = $resp->list;
+		$filter = function($var){ return true; };
 
+		if ($entity == 'Lead') { 
+			$filter = function($var){ return !in_array(
+				$var->status, 
+				['Converted', 'Recycled', 'Dead']
+			); };
+		
+		} else if ($entity == 'Opportunity') {
+			$filter = function($var){ return !in_array(
+				$var->stage,
+				['Closed Won', 'Closed Lost']
+			); };
+		
+		} else if ($entity == 'Project') {
+			$filter = function($var){ return in_array(
+				$var->status,
+				['Not Started', 'Started']
+			); };
+		
+		} else if ($entity == 'Meeting' || $entity == 'Call') {
+			$filter = function($var) {return in_array(
+				$var->status,
+				['Planned']
+			);};
+		
+		} else if ($entity == 'Task') {
+			$filter = function($var) {return !in_array(
+				$var->status,
+				['Completed', 'Canceled']
+			);};
+
+		} else if ($entity == 'Email') {
+			$filter = function($var) {return in_array(
+				$var->status,
+				['Archived']
+			);};
+		}
+
+		$items = array_filter($items, $filter);
+
+
+		// Create list
+		$list = '<ul class="list">';
+		foreach ($items as $value) {
+
+			// Show name
 			$showName = $value->name;
-			if ($exp == 'Project') {
-				$showName = $value->accountName. "<br />&gt;&gt;&gt; " . 
-					$value->typeofprojectName;
+
+			if ($entity == 'Project') {
+				$showName  = $value->accountName.'<br />';
+				$showName .= '&nbsp;&#8594;&nbsp;';
+				$showName .= $value->typeofprojectName;
 			
-			} else if ($exp == 'Receipts') {
-				$showName = $value->name . " (".$value->typeofreceipt.") $". 
-					$value->amount . "<br />&gt;&gt;&gt; " . $value->date . 
-					" " . $value->accountName;
+			} else if ($entity == 'Receipts') {
+				$showName  = $value->name;
+				$showName .= ' ('.$value->typeofreceipt.') ';
+				$showName .= '$'.$value->amount.'<br />';
+				$showName .= "&nbsp;&#8594;&nbsp;";
+				$showName .= $value->date.' ';
+				$showName .= $value->accountName;
 			
-			} else if ($exp == 'Email') {
+			} else if ($entity == 'Email') {
 				$showName = '';
-				if ($value->isRead == '') { $showName .= '<strong>'; }
-				if ($value->isImportant == 1) { $showName .= '&#9733; '; }
-	
-				if (isset($value->personStringData)){
-					$showName .= $value->personStringData;
-				
-				} else {
-					$showName .= $value->fromString;
+				if ($value->isImportant == 1) { 
+					$showName .= '<span style="color: #FB0;">&#9733;</span> '; 
 				}
+	
+				$showName .= preg_replace ( 
+					'#\ *<[^>]*>#' , 
+					'', 
+					$value->fromString
+				);
+				$showName .= "<br />&nbsp;&#8594;&nbsp;";
+				$showName .= $value->name;
 				
-				if ($value->isRead == '') { $showName .= '</strong>'; }
-				$showName .= "<br />&gt;&gt;&gt; ".$value->name;
+				if ($value->isRead == '') { 
+					$showName = '<strong>'.$showName.'</strong>'; 
+				}
 			}
 			
-			if ($show) {
-				$list .= '
-					<li><a href="?route=/entity/'.$exp.'/'.$value->id.'">
-						'.$showName.'
-					</a></li>';
-			}
+			$list .= '
+				<li><a href="?route=/entity/'.$entity.'/'.$value->id.'">
+					'.$showName.'
+				</a></li>';
 		}
 		$list .= '</ul>';
 
-		$tpl = $this->templates->getTemplate('list', true);
-		$tpl = $this->replaceData($tpl, [
-			'data' => $list,
-			'subtitle' => $exp,
+		$tpl = new Template();
+		$tpl->data([ 
 			'breadcrumbs' => '<p class="breadcrumbs">
 				<a href="?route=/">Home</a> > 
-				<a href="?route=/entity">Entities</a> > 
-				'.$exp.'
-			</p>',
+				<a href="?route=/entity">Entities</a> >&nbsp;
+				'.$entity.'
+			</p>', 
+			'subtitle' => $entity,
+			'data' => $list,
 		]);
 
-		echo $this->minify($tpl);
+		$tpl->deploy();
 	}
 
 
 
-	private function item($data) {
-		$exp = $data[1].'/'.$data[2];
-		$ent = $data[1];
-		$itemAA = $data[2];
+	private function item_single($data) {
+		$route = $data[1].'/'.$data[2];
+		$entity = $data[1];
 
-		$api = $this->client->call_api($exp.'?sortBy=name&asc=true');
+		$api = $this->client->call_api($route.'?sortBy=name&asc=true');
 		$resp = json_decode($api['response']);
 
-		$item = '<pre>';
-		$item .= htmlentities(print_r($resp, true));
-		$item .= '</pre>';
+		$single  = $resp;
+		$single  = print_r($single, true);
+		$single  = htmlentities($single);
+		$single  = str_replace(" ", "&nbsp;", $single);
+		$single  = nl2br($single);
+		$single  = '<pre>'.$single.'</pre>';
 
-		$tpl = $this->templates->getTemplate('item', true);
-		$tpl = $this->replaceData($tpl, [
-			'data' => $item,
-			'subtitle' => $itemAA,
+		$tpl = new Template();
+		$tpl->data([ 
 			'breadcrumbs' => '<p class="breadcrumbs">
 				<a href="?route=/">Home</a> > 
 				<a href="?route=/entity">Entities</a> > 
-				<a href="?route=/entity/'.$ent.'">'.$ent.'</a> > 
-				'.$itemAA.'
-			</p>',
+				<a href="?route=/entity/'.$entity.'">'.$entity.'</a> >&nbsp; 
+				'.$resp->name.'
+			</p>', 
+			'subtitle' => $resp->name,
+			'data' => $single,
 		]);
 
-		echo $this->minify($tpl);
-	}*/
+		$tpl->deploy();
+	}
+
+
+
+	private function sing_in($msg) {
+		$tpl = new Template();
+		$tpl->tpl('sing_in');
+		$tpl->data([ 
+			'breadcrumbs' => '', 
+			'subtitle' => 'Access to EspoCRM',
+			'msg' => '<p><strong class="error">'.$msg.'</strong></p>'
+		]);
+
+		$tpl->deploy();
+	}
 }
 
 
